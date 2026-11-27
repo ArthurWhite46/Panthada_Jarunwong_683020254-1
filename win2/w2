@@ -1,0 +1,52 @@
+from pathlib import Path
+import duckdb
+
+ROOT = Path(__file__).resolve().parent.parent
+con = duckdb.connect(str(ROOT / "northwind_dw.duckdb"), read_only=True)
+
+# ข้อ 1: แต่ละตารางใน raw มีกี่แถว
+print("=== ข้อ 1: จำนวนแถวแต่ละตาราง ===")
+tables = con.execute("""
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'raw'
+    ORDER BY table_name
+""").fetchall()
+for (t,) in tables:
+    n = con.execute(f"SELECT COUNT(*) FROM raw.{t}").fetchone()[0]
+    print(f"raw.{t:<22} {n:>6,} แถว")
+
+# ข้อ 2: ชนิดข้อมูลของ order_date ใน orders และ legacy_orders
+print("\n=== ข้อ 2: ชนิดข้อมูล order_date ===")
+rows = con.execute("""
+    SELECT table_name, column_name, data_type
+    FROM information_schema.columns
+    WHERE table_schema = 'raw'
+      AND table_name IN ('orders', 'legacy_orders')
+      AND column_name = 'order_date'
+""").fetchall()
+for r in rows:
+    print(r)
+
+# ดูตัวอย่างค่าจริง เพื่ออธิบายว่าทำไมต่างกัน
+print("\nตัวอย่างค่า orders.order_date:")
+print(con.execute("SELECT order_date FROM raw.orders LIMIT 5").fetchall())
+print("ตัวอย่างค่า legacy_orders.order_date:")
+print(con.execute("SELECT order_date FROM raw.legacy_orders LIMIT 5").fetchall())
+
+# ข้อ 3: รูปแบบค่าในคอลัมน์ supplier_ids ของ products
+print("\n=== ข้อ 3: supplier_ids ของ products ===")
+print(con.execute("""
+    SELECT DISTINCT supplier_ids
+    FROM raw.products
+    ORDER BY supplier_ids
+    LIMIT 30
+""").fetchall())
+
+print(con.execute("""
+    SELECT typeof(supplier_ids) AS dtype, COUNT(*) AS n
+    FROM raw.products
+    GROUP BY 1
+""").fetchall())
+
+con.close()
