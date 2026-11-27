@@ -15,3 +15,4 @@ dbt_packages/
 __pycache__/
 *.pyc
 .DS_Store
+win2/
